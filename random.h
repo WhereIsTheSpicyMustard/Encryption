@@ -7,10 +7,13 @@
 #include "simple_inttypes.h"
 
 typedef struct {
-    const u32 key[8];
+    u32 data[8];
+    u32 key[8];
 } RandomContext;
 
-u64 random_splitmix64(const u64 x);
-status_t random_get(RandomContext* context, const u32 counter);
+status_t random_create(RandomContext* context, u32 key[8]);
+status_t random_get(RandomContext* context, const u64 counter);
+u64      random_splitmix64(void);
+void     random_splitmix64_set(const u64 seed);
 
 #endif
