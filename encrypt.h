@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "error.h"
 #include "simple_inttypes.h"
+#include "random.h"
 
-int encrypt(u8* dest, const u8* src, const u64 key, const size_t size);
+status_t encrypt(u8* dest, u8* src, const size_t dest_size, const size_t src_size, RandomContext* context);
 
 #endif

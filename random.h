@@ -13,6 +13,7 @@ typedef struct {
 
 status_t random_create(RandomContext* context, u32 key[8]);
 status_t random_get(RandomContext* context, const u64 counter);
+void     random_print(const RandomContext* context);
 u64      random_splitmix64(void);
 void     random_splitmix64_set(const u64 seed);
 

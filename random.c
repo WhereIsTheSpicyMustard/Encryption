@@ -42,6 +42,14 @@ status_t random_get(RandomContext* context, const u64 counter)
     return ERR_NONE;
 }
 
+void random_print(const RandomContext* context)
+{
+    if (context == NULL) return;
+    for (int i = 0; i < 8; ++i)
+        printf("%08x", context->data[i]);
+    printf("\n");
+}
+
 
 u64 random_splitmix64(void)
 {
