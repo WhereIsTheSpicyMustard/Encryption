@@ -63,8 +63,14 @@ static void set_block_56(u8* buffer, const u64 val);
 static void set_block_64(u8* buffer, const u64 val);
 /*****************************************************************************************************************/
 
+// performs a xor opperation on the entire buffer
 status_t xor(u8* buffer, const size_t size, RandomContext* context)
 {
+    if (buffer == NULL || context == NULL) {
+        ERROR_REPORT(ERR_NULL);
+        return ERR_NULL;
+    }
+
     int idx = 0;
     for (size_t j = 0; (j + 3) < size; j += 4) {
 
@@ -107,9 +113,6 @@ status_t encrypt(u8* dest, u8* src, const size_t dest_size, const size_t src_siz
 
     return ERR_NONE;
 }
-
-
-
 
 static void set_block_16(u8* buffer, const u16 val)
 {
