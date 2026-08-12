@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "error.h"
 #include "random.h"
 
 static const size_t N = 16;
@@ -29,7 +28,7 @@ static inline u64 SIG_64 (u64 x, u32 a, u32 b, u32 c) { return ROTR_64(x, a) ^ R
 // These are getters and setters, they also trust the caller.
 // Ensure buffer != NULL obviously, ensure buffer will not overflow, each function
 // steps forward in memory a different amount.
-// My way of preventing this from being a bug-infested distastor is to
+// My way of preventing this from being a bug-infested distaster is to
 // pad the buffer from the very start such that the total number of bytes
 // is a multiple of 840.  LCM(1,2,3,4,5,6,7,8) = 840.
 static inline u16 get_block_16(u8* buffer) {
@@ -88,9 +87,9 @@ status_t xor(u8* buffer, const size_t size, RandomContext* context)
 }
 
 
-status_t encrypt(u8* dest, u8* src, const size_t dest_size, const size_t src_size, RandomContext* context)
+status_t encrypt(u8* buffer, const size_t src_size, RandomContext* context)
 {
-    if (dest == NULL || src == NULL || context == NULL) {
+    if (buffer == NULL || context == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
@@ -104,12 +103,7 @@ status_t encrypt(u8* dest, u8* src, const size_t dest_size, const size_t src_siz
     );
 
 
-    if (xor(src, src_size, context)) return 1;
-
-    // copy into dest
-    for (size_t i = 0; i < src_size; ++i) {
-        dest[i] = src[i];
-    }
+    if (xor(buffer, src_size, context)) return 1;
 
     return ERR_NONE;
 }

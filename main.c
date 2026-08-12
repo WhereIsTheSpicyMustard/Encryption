@@ -33,20 +33,23 @@ static int ask_string(const char* prompt, char* out, const int out_size)
 
 int main(void)
 {
+    //                  hash + newline
+    static const size_t padding = 33;
+
     int ret_val = 0;
     u8* key_bytes = NULL;
-    u8* input_bytes = NULL;
-    u8* output_bytes = NULL;
+    u8* buffer = NULL;
 
     char string_buffer[MAX_INPUT_LENGTH];
 
     /****************************************************/
     // load target file
+
     size_t buffer_size;
     if (ask_string("Input target file", string_buffer, MAX_INPUT_LENGTH))
         CLEANUP("Error: could not read argument\n");
-    input_bytes = load_file(string_buffer, &buffer_size);
-    if (input_bytes == NULL)
+    buffer = load_file(string_buffer, &buffer_size);
+    if (buffer == NULL)
         CLEANUP("Error: file not found\n");
     /****************************************************/
 
@@ -91,36 +94,54 @@ int main(void)
     // get sha256 hash of key_bytes
     u32 key[8];
     if (sha256(key_bytes, key_size, key))
-        CLEANUP("Error generating hash\n");
+        CLEANUP("Error: failed generating key\n");
 
-    // init random context -- contains encryption key (hash of key_bytes)
+    // init random context, contains encryption key (hash of key_bytes)
     RandomContext context = {0};
     if (random_create(&context, key))
-        CLEANUP("Error creating random context\n");
+        CLEANUP("Error: failed to create random context\n");
 
-
-    const size_t buffer_out_size = buffer_size;;
-    output_bytes = calloc(buffer_out_size, 1);
+    char* file_name = "FILENAME";
     if (MODE == 'e') {
-        if (encrypt(output_bytes, input_bytes, buffer_out_size, buffer_size, &context)) {
+        /***********************************************************/
+        // add padding for file metadata
+        u8* tmp = realloc(buffer, buffer_size + padding);
+        if (tmp == NULL)
+            CLEANUP("Error: failed to realloc\n");
+        buffer = tmp;
+        memmove(buffer + padding, buffer, buffer_size); // slide buffer forward to make room for metadata
+        buffer_size += padding; // update size
+
+        // append metadata
+
+
+        // generate verification hash
+        u32 hash[8];
+        if (sha256(buffer, buffer_size, hash))
+            CLEANUP("Error generating hash\n");
+
+        // append verification hash
+
+
+
+        /***********************************************************/
+
+        if (encrypt(buffer, buffer_size, &context))
             CLEANUP("Error [en/de]crypting buffer\n");
-        }
+
+        file_name = "encrypted.enc";
+    } else if (MODE == 'd') { // decrypt
 
 
-    } else if (MODE == 'd') {
-
-        // decrypt
         CLEANUP("Not implemented\n");
-
+        file_name = "decrypted";
     }
 
-    if (save_file(output_bytes, buffer_out_size,
-        (MODE == 'e') ? "encrypted.enc" : "decrypted.txt"))
-        CLEANUP("Error saving file\n");
+    if (save_file(buffer, buffer_size, file_name))
+        CLEANUP("Error: could not save file\n");
 
 cleanup:
-    free(input_bytes); // unnesasary since the program is ending here anyways but just good practice
-    free(output_bytes);
+    free(buffer); // unnesasary since the program is ending here anyways but just good practice
     free(key_bytes);
     return ret_val;
 }
