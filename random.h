@@ -14,7 +14,6 @@ typedef enum {
     ERR_NULL,
 } status_t;
 
-
 typedef struct {
     u32 data[8];
     u32 key[8];
