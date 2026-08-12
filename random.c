@@ -22,7 +22,12 @@ status_t random_create(RandomContext* context, u32 new_key[8])
     return ERR_NONE;
 }
 
-status_t random_get(RandomContext* context, const u64 counter)
+u32 random_get(const RandomContext* context, const int index)
+{
+    return context->data[index];
+}
+
+status_t random_generate(RandomContext* context, const u64 counter)
 {
     u8 hash_bytes[40];
 
