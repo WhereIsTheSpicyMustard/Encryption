@@ -10,6 +10,7 @@
 #include "encrypt.h"
 
 #define MAX_INPUT_LENGTH 128
+#define PAD_MOD 840
 
 #define CLEANUP(x) do { printf(x); ret_val = 1; goto cleanup; } while (0)
 
@@ -58,10 +59,9 @@ static int get_ext(char out[4], const char* filename) // gets file extension typ
 int main(void)
 {
     // hash + file ext + newline
-    static const size_t padding = 32 + 5 + 1;
-    static const char ENC_STR[14] = "encrypted.enc";
-    static const char DEC_STR[14] = "decrypted.";
-
+    static const size_t header_size = 32 + 5 + 1;
+    static const char ENC_STR[15] = "encrypted.enc";
+    static const char DEC_STR[15] = "decrypted.";
 
     int ret_val = 0;
     u8* key_bytes = NULL;
@@ -131,26 +131,26 @@ int main(void)
     if (random_create(&context, key))
         CLEANUP("Error: failed to create random context\n");
 
-    char file_name[14] = "abcdefghijklm";
-
+    char file_name[15] = "~~~~~~~~~~~~~~";
+    u32 hash[8];
     if (MODE == 'e') {
         /***********************************************************/
-        // add padding for file metadata
-        u8* tmp = realloc(buffer, buffer_size + padding);
+        // add padding for file metadata - final size needs to be a multiple of 840
+        const size_t padding = PAD_MOD - ((buffer_size + header_size) % PAD_MOD);
+        u8* tmp = realloc(buffer, buffer_size + header_size + padding);
         if (tmp == NULL)
             CLEANUP("Error: failed to realloc\n");
         buffer = tmp;
-        memmove(buffer + padding, buffer, buffer_size); // slide buffer forward to make room for metadata
-        buffer_size += padding; // update size
-        memset(buffer, 0, padding); // clear header
+        memmove(buffer + header_size, buffer, buffer_size); // slide buffer forward to make room for metadata
+        buffer_size += header_size + padding; // update size
+        memset(buffer, 0, header_size); // clear header
 
         // insert metadata file ext
         for (size_t i = 0; i < 5; i++)
-            buffer[padding - i - 2] = (u8)ext[i];
-        buffer[padding - 1] = '\n';
+            buffer[header_size - i - 2] = (u8)ext[i];
+        buffer[header_size - 1] = '\n';
 
         // generate verification hash
-        u32 hash[8];
         if (sha256(buffer, buffer_size, hash))
             CLEANUP("Error: failed generating hash\n");
 
@@ -161,25 +161,51 @@ int main(void)
         if (encrypt(buffer, buffer_size, &context))
             CLEANUP("Error: failed [en/de]crypting buffer\n");
 
-        memcpy(file_name, ENC_STR, 14);
+        memcpy(file_name, ENC_STR, 15);
 
     } else if (MODE == 'd') { // decrypt
 
         if (encrypt(buffer, buffer_size, &context))
             CLEANUP("Error: failed [en/de]crypting buffer\n");
 
-        memcpy(file_name, DEC_STR, 14);
+        memcpy(file_name, DEC_STR, 15);
 
         // extract metadata
         for (size_t i = 0; i < 4; i++) {
-            file_name[i + 10] = (char)buffer[padding - i - 2];
-            if (buffer[padding - i - 2] == '\0')
+            file_name[i + 10] = (char)buffer[header_size - i - 2];
+            if (buffer[header_size - i - 2] == '\0')
                 break;
         }
+        file_name[14] = '\0';
+
+        u32 new_hash[8];
+        memcpy(hash, buffer, 32);
+        memset(buffer, 0, 32);
+        if (sha256(buffer, buffer_size, new_hash))
+            CLEANUP("Error: failed to verify hash\n");
+
+        // printf("    Hash | New Hash \n");
+        for (int i = 0; i < 8; ++i) {
+            if (hash[i] != new_hash[i]) {
+                printf("Warning: invalid hash\n");
+                memcpy(file_name, DEC_STR, 15);
+                file_name[10] = 'b'; file_name[11] = 'i';
+                file_name[12] = 'n'; file_name[13] = '\0';
+                break;
+            }
+            // printf("%08x | %08x\n", hash[i], new_hash[i]);
+        }
+        printf("Success: hash verified\n");
+
     }
 
-    if (save_file(buffer, buffer_size, file_name))
-        CLEANUP("Error: could not save file\n");
+    if (MODE == 'd') {
+        if (save_file(buffer + header_size, buffer_size - header_size, file_name))
+            CLEANUP("Error: could not save file\n");
+    } else {
+        if (save_file(buffer, buffer_size, file_name))
+            CLEANUP("Error: could not save file\n");
+    }
 
 cleanup:
     free(buffer); // unnesasary since the program is ending here anyways but just good practice
