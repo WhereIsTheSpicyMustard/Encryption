@@ -70,22 +70,12 @@ status_t xor(u8* buffer, const size_t size, RandomContext* context)
         return ERR_NULL;
     }
 
-    int idx = 0;
     for (size_t j = 0; (j + 3) < size; j += 4) {
-
-        // get 256 bit hash derived from key and splitmix
-        if (idx % 8 == 0) {
-            if (random_generate(context, random_splitmix64()))
-                return 1;
-        }
-
-        set_block_32(buffer + j, get_block_32(buffer + j) ^ random_get(context, idx % 8));
-        ++idx;
+        set_block_32(buffer + j, get_block_32(buffer + j) ^ random_get(context));
     }
 
     return ERR_NONE;
 }
-
 
 status_t encrypt(u8* buffer, const size_t src_size, RandomContext* context)
 {
@@ -94,7 +84,6 @@ status_t encrypt(u8* buffer, const size_t src_size, RandomContext* context)
         return ERR_NULL;
     }
 
-
     // set splitmix seed based on hash key,
     // used to modify the hash state instead of counter
     random_splitmix64_set(
@@ -102,6 +91,24 @@ status_t encrypt(u8* buffer, const size_t src_size, RandomContext* context)
         ((u64)(context->key[4] ^ context->key[5] ^ context->key[6] ^ context->key[7]) << 32)
     );
 
+    if (xor(buffer, src_size, context)) return 1;
+
+    return ERR_NONE;
+}
+
+status_t decrypt(u8* buffer, const size_t src_size, RandomContext* context)
+{
+    if (buffer == NULL || context == NULL) {
+        ERROR_REPORT(ERR_NULL);
+        return ERR_NULL;
+    }
+
+    // set splitmix seed based on hash key,
+    // used to modify the hash state instead of counter
+    random_splitmix64_set(
+        ((u64)(context->key[0] ^ context->key[1] ^ context->key[2] ^ context->key[3])) |
+        ((u64)(context->key[4] ^ context->key[5] ^ context->key[6] ^ context->key[7]) << 32)
+    );
 
     if (xor(buffer, src_size, context)) return 1;
 

@@ -20,10 +20,8 @@ typedef struct {
 } RandomContext;
 
 status_t random_create(RandomContext* context, u32 key[8]);
-u32 random_get(const RandomContext* context, const int index);
-status_t random_generate(RandomContext* context, const u64 counter);
+u32 random_get(RandomContext* context);
 void     random_print(const RandomContext* context);
-u64      random_splitmix64(void);
 void     random_splitmix64_set(const u64 seed);
 char* error_parse(const status_t err);
 

@@ -9,6 +9,14 @@
 
 static u64 x = 0; // splitmix internal state
 
+static u64 random_splitmix64(void)
+{
+    u64    z = (x        += 0x9e3779b97f4a7c15ULL);
+    z =   (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z =   (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
 status_t random_create(RandomContext* context, u32 new_key[8])
 {
     if (context == NULL || new_key == NULL) {
@@ -21,12 +29,7 @@ status_t random_create(RandomContext* context, u32 new_key[8])
     return ERR_NONE;
 }
 
-u32 random_get(const RandomContext* context, const int index)
-{
-    return context->data[index];
-}
-
-status_t random_generate(RandomContext* context, const u64 counter)
+static status_t random_generate(RandomContext* context, const u64 counter)
 {
     u8 hash_bytes[40];
 
@@ -46,6 +49,17 @@ status_t random_generate(RandomContext* context, const u64 counter)
     return ERR_NONE;
 }
 
+u32 random_get(RandomContext* context)
+{
+    static size_t index = 0;
+    ++index;
+    if (index % 8 == 0) {
+        if (random_generate(context, index / 8))
+            return 0;
+    }
+    return context->data[index % 8];
+}
+
 void random_print(const RandomContext* context)
 {
     if (context == NULL) return;
@@ -55,13 +69,7 @@ void random_print(const RandomContext* context)
 }
 
 
-u64 random_splitmix64(void)
-{
-    u64    z = (x        += 0x9e3779b97f4a7c15ULL);
-    z =   (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    z =   (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-    return z ^ (z >> 31);
-}
+
 
 void random_splitmix64_set(const u64 seed) {
     x = seed;

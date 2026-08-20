@@ -1,3 +1,8 @@
+/*
+TODO
+- strip padding from decrypted output
+*/
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,8 +63,8 @@ static int get_ext(char out[4], const char* filename) // gets file extension typ
 
 int main(void)
 {
-    // hash + file ext + newline
-    static const size_t header_size = 32 + 5 + 1;
+    // hash + padding length + file ext + newline
+    static const size_t header_size = 32 + 8 + 5 + 1;
     static const char ENC_STR[15] = "encrypted.enc";
     static const char DEC_STR[15] = "decrypted.";
 
@@ -133,10 +138,11 @@ int main(void)
 
     char file_name[15] = "~~~~~~~~~~~~~~";
     u32 hash[8];
+    size_t padding = 1313131313;
     if (MODE == 'e') {
         /***********************************************************/
         // add padding for file metadata - final size needs to be a multiple of 840
-        const size_t padding = PAD_MOD - ((buffer_size + header_size) % PAD_MOD);
+        padding = PAD_MOD - ((buffer_size + header_size) % PAD_MOD);
         u8* tmp = realloc(buffer, buffer_size + header_size + padding);
         if (tmp == NULL)
             CLEANUP("Error: failed to realloc\n");
@@ -150,6 +156,10 @@ int main(void)
             buffer[header_size - i - 2] = (u8)ext[i];
         buffer[header_size - 1] = '\n';
 
+        // insert padding length
+        printf("Inserted %zu padded bytes\n", padding);
+        memcpy(buffer + 32, &padding, 8);
+
         // generate verification hash
         if (sha256(buffer, buffer_size, hash))
             CLEANUP("Error: failed generating hash\n");
@@ -159,24 +169,29 @@ int main(void)
         /***********************************************************/
 
         if (encrypt(buffer, buffer_size, &context))
-            CLEANUP("Error: failed [en/de]crypting buffer\n");
+            CLEANUP("Error: failed encrypting buffer\n");
 
         memcpy(file_name, ENC_STR, 15);
 
     } else if (MODE == 'd') { // decrypt
 
-        if (encrypt(buffer, buffer_size, &context))
-            CLEANUP("Error: failed [en/de]crypting buffer\n");
+        if (decrypt(buffer, buffer_size, &context))
+            CLEANUP("Error: failed decrypting buffer\n");
 
         memcpy(file_name, DEC_STR, 15);
 
-        // extract metadata
+        // extract extension
         for (size_t i = 0; i < 4; i++) {
             file_name[i + 10] = (char)buffer[header_size - i - 2];
             if (buffer[header_size - i - 2] == '\0')
                 break;
         }
         file_name[14] = '\0';
+
+        // extract padding
+        padding = 1212121212;
+        memcpy(&padding, buffer + 32, 8);
+        printf("Truncating %zu padded bytes\n", padding);
 
         u32 new_hash[8];
         memcpy(hash, buffer, 32);
@@ -187,20 +202,21 @@ int main(void)
         // printf("    Hash | New Hash \n");
         for (int i = 0; i < 8; ++i) {
             if (hash[i] != new_hash[i]) {
-                printf("Warning: invalid hash\n");
+                printf("Warning: invalid hash.  No bytes truncated\n");
                 memcpy(file_name, DEC_STR, 15);
                 file_name[10] = 'b'; file_name[11] = 'i';
                 file_name[12] = 'n'; file_name[13] = '\0';
-                break;
+                padding = 0;
+                goto INVALID_HASH;
             }
             // printf("%08x | %08x\n", hash[i], new_hash[i]);
         }
         printf("Success: hash verified\n");
-
     }
+INVALID_HASH:
 
     if (MODE == 'd') {
-        if (save_file(buffer + header_size, buffer_size - header_size, file_name))
+        if (save_file(buffer + header_size, buffer_size - header_size - padding, file_name))
             CLEANUP("Error: could not save file\n");
     } else {
         if (save_file(buffer, buffer_size, file_name))
