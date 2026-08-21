@@ -63,10 +63,10 @@ static int get_ext(char out[4], const char* filename) // gets file extension typ
 
 int main(void)
 {
-    // hash + padding length + file ext + newline
-    static const size_t header_size = 32 + 8 + 5 + 1;
-    static const char ENC_STR[15] = "encrypted.enc";
-    static const char DEC_STR[15] = "decrypted.";
+    // hash + padding length + newline
+    static const size_t header_size = 32 + 8 + 1;
+    static const char* const ENC_STR = "encrypted.enc";
+    static const char* const DEC_STR = "decrypted.enc";
 
     int ret_val = 0;
     u8* key_bytes = NULL;
@@ -82,10 +82,6 @@ int main(void)
     buffer = load_file(string_buffer, &buffer_size);
     if (buffer == NULL)
         CLEANUP("Error: file not found\n");
-    char ext[5] = {0};
-    if (get_ext(ext, string_buffer))
-        CLEANUP("Error: could not parse file extension\n");
-    // printf("%s\n", ext);
 
     /****************************************************/
 
@@ -136,7 +132,6 @@ int main(void)
     if (random_create(&context, key))
         CLEANUP("Error: failed to create random context\n");
 
-    char file_name[15] = "~~~~~~~~~~~~~~";
     u32 hash[8];
     size_t padding = 1313131313;
     if (MODE == 'e') {
@@ -151,9 +146,7 @@ int main(void)
         buffer_size += header_size + padding; // update size
         memset(buffer, 0, header_size); // clear header
 
-        // insert metadata file ext
-        for (size_t i = 0; i < 5; i++)
-            buffer[header_size - i - 2] = (u8)ext[i];
+        // insert metadata
         buffer[header_size - 1] = '\n';
 
         // insert padding length
@@ -171,22 +164,10 @@ int main(void)
         if (encrypt(buffer, buffer_size, &context))
             CLEANUP("Error: failed encrypting buffer\n");
 
-        memcpy(file_name, ENC_STR, 15);
-
     } else if (MODE == 'd') { // decrypt
 
         if (decrypt(buffer, buffer_size, &context))
             CLEANUP("Error: failed decrypting buffer\n");
-
-        memcpy(file_name, DEC_STR, 15);
-
-        // extract extension
-        for (size_t i = 0; i < 4; i++) {
-            file_name[i + 10] = (char)buffer[header_size - i - 2];
-            if (buffer[header_size - i - 2] == '\0')
-                break;
-        }
-        file_name[14] = '\0';
 
         // extract padding
         padding = 1212121212;
@@ -203,9 +184,6 @@ int main(void)
         for (int i = 0; i < 8; ++i) {
             if (hash[i] != new_hash[i]) {
                 printf("Warning: invalid hash.  No bytes truncated\n");
-                memcpy(file_name, DEC_STR, 15);
-                file_name[10] = 'b'; file_name[11] = 'i';
-                file_name[12] = 'n'; file_name[13] = '\0';
                 padding = 0;
                 goto INVALID_HASH;
             }
@@ -216,10 +194,10 @@ int main(void)
 INVALID_HASH:
 
     if (MODE == 'd') {
-        if (save_file(buffer + header_size, buffer_size - header_size - padding, file_name))
+        if (save_file(buffer + header_size, buffer_size - header_size - padding, DEC_STR))
             CLEANUP("Error: could not save file\n");
     } else {
-        if (save_file(buffer, buffer_size, file_name))
+        if (save_file(buffer, buffer_size, ENC_STR))
             CLEANUP("Error: could not save file\n");
     }
 
