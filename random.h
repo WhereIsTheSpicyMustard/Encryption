@@ -17,7 +17,6 @@ typedef enum {
 
 status_t random_create(u32 key[8]);
 void     random_print(void);
-status_t random_precompute(const size_t count);
 void     random_destroy(void);
 u32      random_get(const size_t index);
 char*    error_parse(const status_t err);

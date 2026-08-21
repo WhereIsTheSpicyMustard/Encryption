@@ -118,11 +118,6 @@ status_t encrypt(u8* buffer, const size_t src_size)
         return ERR_NULL;
     }
 
-    if (random_precompute(xor_random_count + perm_random_count)) {
-        ERROR_REPORT(ERR_FAIL);
-        return ERR_FAIL;
-    }
-
     // encrypt_perm_block_8(buffer, src_size, block_count * 8);
     encrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1));
     // encrypt_perm_block_24(buffer, src_size, rand_index);
@@ -168,11 +163,6 @@ status_t decrypt(u8* buffer, const size_t src_size)
     if (buffer == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
-    }
-
-    if (random_precompute(xor_random_count + perm_random_count)) {
-        ERROR_REPORT(ERR_FAIL);
-        return ERR_FAIL;
     }
 
     // decrypt_perm_block_8(buffer, src_size, block_count * 8 + (src_size / 1) - 1);

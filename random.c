@@ -9,13 +9,13 @@
 #include "sha256.h"
 
 typedef struct RandomContext {
-    u32 data[8];
     u32 key[8];
+    u32 cache_data[8];
+    size_t cache_block;
+    int cache_valid;
 } RandomContext;
 
 static RandomContext context = {0};
-static u32* random_buffer = NULL;
-static size_t random_buffer_size = 0;
 
 status_t random_create(u32 new_key[8])
 {
@@ -23,79 +23,45 @@ status_t random_create(u32 new_key[8])
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
-
     memcpy(context.key, new_key, 32);
-
+    context.cache_valid = 0;
     return ERR_NONE;
 }
 
-static status_t random_generate(const u64 counter)
+static status_t random_generate_block(const size_t block)
 {
     u8 hash_bytes[40];
-
     memcpy(hash_bytes, context.key, 32);
-    memcpy(hash_bytes + 32, &counter, 8);
+    memcpy(hash_bytes + 32, &block, 8);
 
-    if (sha256(hash_bytes, 40, context.data)) {
+    if (sha256(hash_bytes, 40, context.cache_data)) {
         ERROR_REPORT(ERR_SHA);
         return ERR_SHA;
     }
-
+    context.cache_block = block;
+    context.cache_valid = 1;
     return ERR_NONE;
-}
-
-static u32 random_get_internal(void)
-{
-    static size_t idx = 0;
-    ++idx;
-    if (idx % 8 == 0) {
-        if (random_generate(idx))
-            return 0;
-    }
-    return context.data[idx % 8];
-}
-
-status_t random_precompute(const size_t count)
-{
-    random_buffer = malloc(count * sizeof(*random_buffer));
-    if (random_buffer == NULL) {
-        ERROR_REPORT(ERR_NULL);
-        return ERR_NULL;
-    }
-
-    random_buffer_size = count;
-
-    for (size_t i = 0; i < count; ++i)
-        random_buffer[i] = random_get_internal();
-
-    return ERR_NONE;
-}
-
-void random_destroy(void)
-{
-    free(random_buffer);
-    random_buffer = NULL;
 }
 
 u32 random_get(const size_t index)
 {
-    if (random_buffer == NULL) {
-        ERROR_REPORT(ERR_NULL);
-        return 0;
+    const size_t block = index / 8;
+    if (!context.cache_valid || block != context.cache_block) {
+        if (random_generate_block(block)) return 0;
     }
-
-    if (index >= random_buffer_size) {
-        ERROR_REPORT(ERR_OOB);
-        return ERR_OOB;
-    }
-    return random_buffer[index];
+    return context.cache_data[index % 8];
 }
 
 void random_print(void)
 {
     for (int i = 0; i < 8; ++i)
-        printf("%08x", context.data[i]);
+        printf("%08x", context.cache_data[i]);
     printf("\n");
+}
+
+void random_destroy(void)
+{
+    context.cache_valid = 0;
 }
 
 char* error_parse(const status_t err)
