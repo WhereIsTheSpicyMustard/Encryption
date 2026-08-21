@@ -115,6 +115,7 @@ int main(void)
         if (tmp == NULL)
             CLEANUP("Error: failed to realloc\n");
         buffer = tmp;
+        memset(buffer + buffer_size, 0, header_size + padding); // clear new memory
         memmove(buffer + header_size, buffer, buffer_size); // slide buffer forward to make room for metadata
         buffer_size += header_size + padding; // update size
         memset(buffer, 0, header_size); // clear header
@@ -133,7 +134,7 @@ int main(void)
         // insert verification hash - 32 bytes reserved at buffer start
         memcpy(buffer, hash, 32);
 
-        // // TEST
+        // TEST
         // if (save_file(buffer, buffer_size, "debug_in.enc"))
         //     CLEANUP("Error: could not save file\n");
         /***********************************************************/
@@ -146,7 +147,7 @@ int main(void)
         if (decrypt(buffer, buffer_size))
             CLEANUP("Error: failed decrypting buffer\n");
 
-        // // TEST
+        // TEST
         // if (save_file(buffer, buffer_size, "debug.enc"))
         //     CLEANUP("Error: could not save file\n");
 
@@ -163,12 +164,12 @@ int main(void)
 
         // printf("    Hash | New Hash \n");
         for (int i = 0; i < 8; ++i) {
-            if (hash[i] != new_hash[i]) {
-                printf("Warning: invalid hash.  No bytes truncated\n");
-                padding = 0;
-                goto INVALID_HASH;
-            }
             // printf("%08x | %08x\n", hash[i], new_hash[i]);
+            if (hash[i] == new_hash[i]) continue;
+            printf("Warning: invalid hash.  No bytes truncated\n");
+            padding = 0;
+            goto INVALID_HASH;
+
         }
         printf("Success: hash verified\n");
     }

@@ -118,23 +118,40 @@ status_t encrypt(u8* buffer, const size_t src_size)
         return ERR_NULL;
     }
 
-    // encrypt_perm_block_8(buffer, src_size, block_count * 8);
-    encrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1));
-    // encrypt_perm_block_24(buffer, src_size, rand_index);
-    // encrypt_perm_block_32(buffer, src_size, rand_index);
-    // encrypt_perm_block_40(buffer, src_size, rand_index);
-    // encrypt_perm_block_48(buffer, src_size, rand_index);
-    // encrypt_perm_block_56(buffer, src_size, rand_index);
-    // encrypt_perm_block_64(buffer, src_size, rand_index);
 
-    // encrypt_xor(buffer, src_size, block_count * 0);
-    // encrypt_xor(buffer, src_size, block_count * 1);
-    // encrypt_xor(buffer, src_size, block_count * 2);
-    // encrypt_xor(buffer, src_size, block_count * 3);
-    // encrypt_xor(buffer, src_size, block_count * 4);
-    // encrypt_xor(buffer, src_size, block_count * 5);
-    // encrypt_xor(buffer, src_size, block_count * 6);
-    // encrypt_xor(buffer, src_size, block_count * 7);
+    size_t random_perm_offset = block_count * 8;
+
+    encrypt_perm_block_64(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 8;
+    encrypt_xor(buffer, src_size, block_count * 0);
+
+    encrypt_perm_block_56(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 7;
+    encrypt_xor(buffer, src_size, block_count * 1);
+
+    encrypt_perm_block_48(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 6;
+    encrypt_xor(buffer, src_size, block_count * 2);
+
+    encrypt_perm_block_40(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 5;
+    encrypt_xor(buffer, src_size, block_count * 3);
+
+    encrypt_perm_block_32(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 4;
+    encrypt_xor(buffer, src_size, block_count * 4);
+
+    encrypt_perm_block_24(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 3;
+    encrypt_xor(buffer, src_size, block_count * 5);
+
+    encrypt_perm_block_16(buffer, src_size, random_perm_offset);
+    random_perm_offset += src_size / 2;
+    encrypt_xor(buffer, src_size, block_count * 6);
+
+    encrypt_perm_block_8(buffer, src_size, random_perm_offset);
+    encrypt_xor(buffer, src_size, block_count * 7);
+
 
     return ERR_NONE;
 }
@@ -165,23 +182,39 @@ status_t decrypt(u8* buffer, const size_t src_size)
         return ERR_NULL;
     }
 
-    // decrypt_perm_block_8(buffer, src_size, block_count * 8 + (src_size / 1) - 1);
-    decrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1) + (src_size / 2) - 1);
-    // decrypt_perm_block_24(buffer, src_size, rand_index);
-    // decrypt_perm_block_32(buffer, src_size, rand_index);
-    // decrypt_perm_block_40(buffer, src_size, rand_index);
-    // decrypt_perm_block_48(buffer, src_size, rand_index);
-    // decrypt_perm_block_56(buffer, src_size, rand_index);
-    // decrypt_perm_block_64(buffer, src_size, rand_index);
+    size_t random_perm_offset = block_count * 8 + perm_random_count;
 
-    // encrypt_xor(buffer, src_size, block_count * 7);
-    // encrypt_xor(buffer, src_size, block_count * 6);
-    // encrypt_xor(buffer, src_size, block_count * 5);
-    // encrypt_xor(buffer, src_size, block_count * 4);
-    // encrypt_xor(buffer, src_size, block_count * 3);
-    // encrypt_xor(buffer, src_size, block_count * 2);
-    // encrypt_xor(buffer, src_size, block_count * 1);
-    // encrypt_xor(buffer, src_size, block_count * 0);
+    encrypt_xor(buffer, src_size, block_count * 7);
+    decrypt_perm_block_8(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 1;
+
+    encrypt_xor(buffer, src_size, block_count * 6);
+    decrypt_perm_block_16(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 2;
+
+    encrypt_xor(buffer, src_size, block_count * 5);
+    decrypt_perm_block_24(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 3;
+
+    encrypt_xor(buffer, src_size, block_count * 4);
+    decrypt_perm_block_32(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 4;
+
+    encrypt_xor(buffer, src_size, block_count * 3);
+    decrypt_perm_block_40(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 5;
+
+    encrypt_xor(buffer, src_size, block_count * 2);
+    decrypt_perm_block_48(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 6;
+
+    encrypt_xor(buffer, src_size, block_count * 1);
+    decrypt_perm_block_56(buffer, src_size, random_perm_offset - 1);
+    random_perm_offset -= src_size / 7;
+
+    encrypt_xor(buffer, src_size, block_count * 0);
+    decrypt_perm_block_64(buffer, src_size, random_perm_offset - 1);
+
 
     return ERR_NONE;
 }
@@ -235,6 +268,157 @@ static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t ra
         set_block_16(buffer + j, temp);
     }
 }
+
+
+static void encrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 2) < size; i += 3) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/3 + 1) * 3);
+        const u32 temp = get_block_24(buffer + i);
+        set_block_24(buffer + i, get_block_24(buffer + j));
+        set_block_24(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 3;) {
+        i -= 3;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/3 + 1) * 3);
+        const u32 temp = get_block_24(buffer + i);
+        set_block_24(buffer + i, get_block_24(buffer + j));
+        set_block_24(buffer + j, temp);
+    }
+}
+
+
+static void encrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 3) < size; i += 4) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/4 + 1) * 4);
+        const u32 temp = get_block_32(buffer + i);
+        set_block_32(buffer + i, get_block_32(buffer + j));
+        set_block_32(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 4;) {
+        i -= 4;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/4 + 1) * 4);
+        const u32 temp = get_block_32(buffer + i);
+        set_block_32(buffer + i, get_block_32(buffer + j));
+        set_block_32(buffer + j, temp);
+    }
+}
+
+
+static void encrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 4) < size; i += 5) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/5 + 1) * 5);
+        const u64 temp = get_block_40(buffer + i);
+        set_block_40(buffer + i, get_block_40(buffer + j));
+        set_block_40(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 5;) {
+        i -= 5;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/5 + 1) * 5);
+        const u64 temp = get_block_40(buffer + i);
+        set_block_40(buffer + i, get_block_40(buffer + j));
+        set_block_40(buffer + j, temp);
+    }
+}
+
+
+static void encrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 5) < size; i += 6) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/6 + 1) * 6);
+        const u64 temp = get_block_48(buffer + i);
+        set_block_48(buffer + i, get_block_48(buffer + j));
+        set_block_48(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 6;) {
+        i -= 6;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/6 + 1) * 6);
+        const u64 temp = get_block_48(buffer + i);
+        set_block_48(buffer + i, get_block_48(buffer + j));
+        set_block_48(buffer + j, temp);
+    }
+}
+
+
+static void encrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 6) < size; i += 7) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/7 + 1) * 7);
+        const u64 temp = get_block_56(buffer + i);
+        set_block_56(buffer + i, get_block_56(buffer + j));
+        set_block_56(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 7;) {
+        i -= 7;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/7 + 1) * 7);
+        const u64 temp = get_block_56(buffer + i);
+        set_block_56(buffer + i, get_block_56(buffer + j));
+        set_block_56(buffer + j, temp);
+    }
+}
+
+
+static void encrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 7) < size; i += 8) {
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/8 + 1) * 8);
+        const u64 temp = get_block_64(buffer + i);
+        set_block_64(buffer + i, get_block_64(buffer + j));
+        set_block_64(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 8;) {
+        i -= 8;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/8 + 1) * 8);
+        const u64 temp = get_block_64(buffer + i);
+        set_block_64(buffer + i, get_block_64(buffer + j));
+        set_block_64(buffer + j, temp);
+    }
+}
+
 /*****************************************************************************************************************/
 
 static void set_block_16(u8* buffer, const u16 val)
