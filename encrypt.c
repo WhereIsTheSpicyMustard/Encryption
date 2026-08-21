@@ -11,7 +11,6 @@
 
 /*****************************************************************************************************************/
 // These are helper functions that trust the caller.
-// I know this is generally bad practice but here we are, I don't care.
 // Ensure n != 0, a != 0, b != 0, c != 0
 static inline u8  ROTR_8  (u32 x, u32 n) { return (u8) ((x >> n) | (x << (8  - n))); }
 static inline u16 ROTR_16 (u32 x, u32 n) { return (u16)((x >> n) | (x << (16 - n))); }
@@ -176,7 +175,6 @@ status_t decrypt(u8* buffer, const size_t src_size)
         return ERR_FAIL;
     }
 
-
     // decrypt_perm_block_8(buffer, src_size, block_count * 8 + (src_size / 1) - 1);
     decrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1) + (src_size / 2) - 1);
     // decrypt_perm_block_24(buffer, src_size, rand_index);
@@ -227,9 +225,8 @@ static void decrypt_perm_block_8(u8* buffer, const size_t size, const size_t ran
 static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
 {
     size_t rand_counter = 0;
-
     for (size_t i = 0; (i + 1) < size; i += 2) {
-        const size_t j = random_get(rand_index + (rand_counter++)) % (i + 1);
+        const size_t j = (random_get(rand_index + (rand_counter++)) % (i/2 + 1) * 2);
         const u16 temp = get_block_16(buffer + i);
         set_block_16(buffer + i, get_block_16(buffer + j));
         set_block_16(buffer + j, temp);
@@ -238,7 +235,15 @@ static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t ra
 
 static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size;
+    for (; i >= 2;) {
+        i -= 2;
+        const size_t j = (random_get(rand_index - (rand_counter++)) % (i/2 + 1) * 2);
+        const u16 temp = get_block_16(buffer + i);
+        set_block_16(buffer + i, get_block_16(buffer + j));
+        set_block_16(buffer + j, temp);
+    }
 }
 /*****************************************************************************************************************/
 

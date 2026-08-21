@@ -102,6 +102,9 @@ int main(void)
     if (sha256(key_bytes, key_size, key))
         CLEANUP("Error: failed generating key\n");
 
+    if (random_create(key))
+         CLEANUP("Error: failed to initialize random context\n");
+
     u32 hash[8];
     size_t padding = 1313131313;
     if (MODE == 'e') {
@@ -129,6 +132,10 @@ int main(void)
 
         // insert verification hash - 32 bytes reserved at buffer start
         memcpy(buffer, hash, 32);
+
+        // // TEST
+        // if (save_file(buffer, buffer_size, "debug_in.enc"))
+        //     CLEANUP("Error: could not save file\n");
         /***********************************************************/
 
         if (encrypt(buffer, buffer_size))
@@ -138,6 +145,10 @@ int main(void)
 
         if (decrypt(buffer, buffer_size))
             CLEANUP("Error: failed decrypting buffer\n");
+
+        // // TEST
+        // if (save_file(buffer, buffer_size, "debug.enc"))
+        //     CLEANUP("Error: could not save file\n");
 
         // extract padding
         padding = 1212121212;
