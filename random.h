@@ -12,17 +12,14 @@ typedef enum {
     ERR_OOB,
     ERR_SHA,
     ERR_NULL,
+    ERR_FAIL,
 } status_t;
 
-typedef struct {
-    u32 data[8];
-    u32 key[8];
-} RandomContext;
-
-status_t random_create(RandomContext* context, u32 key[8]);
-u32 random_get(RandomContext* context);
-void     random_print(const RandomContext* context);
-void     random_splitmix64_set(const u64 seed);
-char* error_parse(const status_t err);
+status_t random_create(u32 key[8]);
+void     random_print(void);
+status_t random_precompute(const size_t count);
+void     random_destroy(void);
+u32      random_get(const size_t index);
+char*    error_parse(const status_t err);
 
 #endif

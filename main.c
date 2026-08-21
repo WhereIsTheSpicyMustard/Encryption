@@ -36,31 +36,6 @@ static int ask_string(const char* prompt, char* out, const int out_size)
     }
 }
 
-static int get_ext(char out[4], const char* filename) // gets file extension type, max 4 characters
-{
-    if (filename == NULL)
-        return 1;
-
-    int idx = 0;
-    for (size_t i = 0; filename[i] != '\0'; ++i) {
-        if (filename[i] == '.') {
-            idx = 0;
-            out[0] = '\0';
-            continue;
-        }
-
-        if (idx >= 4) {
-            ++idx; // keep incrementing to detect invalid length extension
-            continue;
-        }
-        out[idx++] = filename[i];
-        out[idx] = '\0';
-    }
-
-    return idx > 4;
-}
-
-
 int main(void)
 {
     // hash + padding length + newline
@@ -127,11 +102,6 @@ int main(void)
     if (sha256(key_bytes, key_size, key))
         CLEANUP("Error: failed generating key\n");
 
-    // init random context, contains encryption key (hash of key_bytes)
-    RandomContext context = {0};
-    if (random_create(&context, key))
-        CLEANUP("Error: failed to create random context\n");
-
     u32 hash[8];
     size_t padding = 1313131313;
     if (MODE == 'e') {
@@ -161,12 +131,12 @@ int main(void)
         memcpy(buffer, hash, 32);
         /***********************************************************/
 
-        if (encrypt(buffer, buffer_size, &context))
+        if (encrypt(buffer, buffer_size))
             CLEANUP("Error: failed encrypting buffer\n");
 
     } else if (MODE == 'd') { // decrypt
 
-        if (decrypt(buffer, buffer_size, &context))
+        if (decrypt(buffer, buffer_size))
             CLEANUP("Error: failed decrypting buffer\n");
 
         // extract padding
@@ -191,6 +161,7 @@ int main(void)
         }
         printf("Success: hash verified\n");
     }
+
 INVALID_HASH:
 
     if (MODE == 'd') {
@@ -204,5 +175,6 @@ INVALID_HASH:
 cleanup:
     free(buffer); // unnesasary since the program is ending here anyways but just good practice
     free(key_bytes);
+    random_destroy();
     return ret_val;
 }

@@ -6,7 +6,8 @@
 #include <string.h>
 #include "random.h"
 
-static const size_t N = 16;
+#include <assert.h>
+
 
 /*****************************************************************************************************************/
 // These are helper functions that trust the caller.
@@ -61,59 +62,185 @@ static void set_block_48(u8* buffer, const u64 val);
 static void set_block_56(u8* buffer, const u64 val);
 static void set_block_64(u8* buffer, const u64 val);
 /*****************************************************************************************************************/
+// These are permutation algorithms which shuffle the given buffer
+// in chunks.  This is why the buffer is padded to be a multiple of
+// 840 bytes, which is evenly divisible by all the numbers 1-8 inclusive.
+static void encrypt_perm_block_8 (u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index);
+
+static void decrypt_perm_block_8 (u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index);
+/*****************************************************************************************************************/
+
 
 // performs a xor opperation on the entire buffer
-status_t xor(u8* buffer, const size_t size, RandomContext* context)
+static void encrypt_xor(u8* buffer, const size_t size, const size_t rand_index)
 {
-    if (buffer == NULL || context == NULL) {
+    size_t rand_counter = 0;
+    for (size_t j = 0; (j + 3) < size; j += 4)
+        set_block_32(buffer + j, get_block_32(buffer + j) ^ random_get(rand_index + (rand_counter++)));
+}
+
+status_t encrypt(u8* buffer, const size_t src_size)
+{
+    assert(src_size % 840 == 0);
+
+    // number of u32 blocks
+    const size_t block_count = src_size / 4;
+
+    // number of random values needed for xor
+    const size_t xor_random_count = 8 * (src_size / 4);
+
+    // number of random values needed for permuations
+    const size_t perm_random_count =
+        (src_size / 1) +
+        (src_size / 2) +
+        (src_size / 3) +
+        (src_size / 4) +
+        (src_size / 5) +
+        (src_size / 6) +
+        (src_size / 7) +
+        (src_size / 8);
+
+    if (buffer == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
 
-    for (size_t j = 0; (j + 3) < size; j += 4) {
-        set_block_32(buffer + j, get_block_32(buffer + j) ^ random_get(context));
+    if (random_precompute(xor_random_count + perm_random_count)) {
+        ERROR_REPORT(ERR_FAIL);
+        return ERR_FAIL;
     }
+
+    // encrypt_perm_block_8(buffer, src_size, block_count * 8);
+    encrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1));
+    // encrypt_perm_block_24(buffer, src_size, rand_index);
+    // encrypt_perm_block_32(buffer, src_size, rand_index);
+    // encrypt_perm_block_40(buffer, src_size, rand_index);
+    // encrypt_perm_block_48(buffer, src_size, rand_index);
+    // encrypt_perm_block_56(buffer, src_size, rand_index);
+    // encrypt_perm_block_64(buffer, src_size, rand_index);
+
+    // encrypt_xor(buffer, src_size, block_count * 0);
+    // encrypt_xor(buffer, src_size, block_count * 1);
+    // encrypt_xor(buffer, src_size, block_count * 2);
+    // encrypt_xor(buffer, src_size, block_count * 3);
+    // encrypt_xor(buffer, src_size, block_count * 4);
+    // encrypt_xor(buffer, src_size, block_count * 5);
+    // encrypt_xor(buffer, src_size, block_count * 6);
+    // encrypt_xor(buffer, src_size, block_count * 7);
 
     return ERR_NONE;
 }
 
-status_t encrypt(u8* buffer, const size_t src_size, RandomContext* context)
+status_t decrypt(u8* buffer, const size_t src_size)
 {
-    if (buffer == NULL || context == NULL) {
+    assert(src_size % 840 == 0);
+
+    // number of u32 blocks
+    const size_t block_count = src_size / 4;
+
+    // number of random values needed for xor
+    const size_t xor_random_count = 8 * (src_size / 4);
+
+    // number of random values needed for permuations
+    const size_t perm_random_count =
+    (src_size / 1) +
+    (src_size / 2) +
+    (src_size / 3) +
+    (src_size / 4) +
+    (src_size / 5) +
+    (src_size / 6) +
+    (src_size / 7) +
+    (src_size / 8);
+
+    if (buffer == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
 
-    // set splitmix seed based on hash key,
-    // used to modify the hash state instead of counter
-    random_splitmix64_set(
-        ((u64)(context->key[0] ^ context->key[1] ^ context->key[2] ^ context->key[3])) |
-        ((u64)(context->key[4] ^ context->key[5] ^ context->key[6] ^ context->key[7]) << 32)
-    );
-
-    if (xor(buffer, src_size, context)) return 1;
-
-    return ERR_NONE;
-}
-
-status_t decrypt(u8* buffer, const size_t src_size, RandomContext* context)
-{
-    if (buffer == NULL || context == NULL) {
-        ERROR_REPORT(ERR_NULL);
-        return ERR_NULL;
+    if (random_precompute(xor_random_count + perm_random_count)) {
+        ERROR_REPORT(ERR_FAIL);
+        return ERR_FAIL;
     }
 
-    // set splitmix seed based on hash key,
-    // used to modify the hash state instead of counter
-    random_splitmix64_set(
-        ((u64)(context->key[0] ^ context->key[1] ^ context->key[2] ^ context->key[3])) |
-        ((u64)(context->key[4] ^ context->key[5] ^ context->key[6] ^ context->key[7]) << 32)
-    );
 
-    if (xor(buffer, src_size, context)) return 1;
+    // decrypt_perm_block_8(buffer, src_size, block_count * 8 + (src_size / 1) - 1);
+    decrypt_perm_block_16(buffer, src_size, block_count * 8 + (src_size / 1) + (src_size / 2) - 1);
+    // decrypt_perm_block_24(buffer, src_size, rand_index);
+    // decrypt_perm_block_32(buffer, src_size, rand_index);
+    // decrypt_perm_block_40(buffer, src_size, rand_index);
+    // decrypt_perm_block_48(buffer, src_size, rand_index);
+    // decrypt_perm_block_56(buffer, src_size, rand_index);
+    // decrypt_perm_block_64(buffer, src_size, rand_index);
+
+    // encrypt_xor(buffer, src_size, block_count * 7);
+    // encrypt_xor(buffer, src_size, block_count * 6);
+    // encrypt_xor(buffer, src_size, block_count * 5);
+    // encrypt_xor(buffer, src_size, block_count * 4);
+    // encrypt_xor(buffer, src_size, block_count * 3);
+    // encrypt_xor(buffer, src_size, block_count * 2);
+    // encrypt_xor(buffer, src_size, block_count * 1);
+    // encrypt_xor(buffer, src_size, block_count * 0);
 
     return ERR_NONE;
 }
+
+/*****************************************************************************************************************/
+static void encrypt_perm_block_8(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+
+    for (size_t i = 0; i < size; ++i) {
+        const size_t j = random_get(rand_index + (rand_counter++)) % (i + 1);
+        const u8 temp = buffer[i];
+        buffer[i] = buffer[j];
+        buffer[j] = temp;
+    }
+}
+
+static void decrypt_perm_block_8(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+
+    for (size_t i = size; i > 0; --i) {
+        const size_t j = random_get(rand_index - (rand_counter++)) % ((i - 1) + 1);
+        const u8 temp = buffer[i - 1];
+        buffer[i - 1] = buffer[j];
+        buffer[j] = temp;
+    }
+}
+
+
+static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+
+    for (size_t i = 0; (i + 1) < size; i += 2) {
+        const size_t j = random_get(rand_index + (rand_counter++)) % (i + 1);
+        const u16 temp = get_block_16(buffer + i);
+        set_block_16(buffer + i, get_block_16(buffer + j));
+        set_block_16(buffer + j, temp);
+    }
+}
+
+static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+/*****************************************************************************************************************/
 
 static void set_block_16(u8* buffer, const u16 val)
 {
