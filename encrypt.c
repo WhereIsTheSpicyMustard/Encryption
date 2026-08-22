@@ -139,38 +139,52 @@ status_t encrypt(u8* buffer, const size_t src_size)
         return ERR_NULL;
     }
 
+    size_t random_perm_offset = xor_random_count;
+    size_t random_rot_offset = INT64_MAX; // some large constant
 
-    size_t random_perm_offset = block_count * 8;
-
+    encrypt_rot_8(buffer, src_size, random_rot_offset);
     encrypt_perm_block_64(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 8;
-
     encrypt_xor(buffer, src_size, block_count * 0);
+    random_perm_offset += src_size / 8;
+    random_rot_offset += src_size;
 
+    encrypt_rot_16(buffer, src_size, random_rot_offset);
     encrypt_perm_block_56(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 7;
     encrypt_xor(buffer, src_size, block_count * 1);
+    random_perm_offset += src_size / 7;
+    random_rot_offset += src_size;
 
+    encrypt_rot_24(buffer, src_size, random_rot_offset);
     encrypt_perm_block_48(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 6;
     encrypt_xor(buffer, src_size, block_count * 2);
+    random_perm_offset += src_size / 6;
+    random_rot_offset += src_size;
 
+    encrypt_rot_32(buffer, src_size, random_rot_offset);
     encrypt_perm_block_40(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 5;
     encrypt_xor(buffer, src_size, block_count * 3);
+    random_perm_offset += src_size / 5;
+    random_rot_offset += src_size;
 
+    encrypt_rot_40(buffer, src_size, random_rot_offset);
     encrypt_perm_block_32(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 4;
     encrypt_xor(buffer, src_size, block_count * 4);
+    random_perm_offset += src_size / 4;
+    random_rot_offset += src_size;
 
+    encrypt_rot_48(buffer, src_size, random_rot_offset);
     encrypt_perm_block_24(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 3;
     encrypt_xor(buffer, src_size, block_count * 5);
+    random_perm_offset += src_size / 3;
+    random_rot_offset += src_size;
 
+    encrypt_rot_56(buffer, src_size, random_rot_offset);
     encrypt_perm_block_16(buffer, src_size, random_perm_offset);
-    random_perm_offset += src_size / 2;
     encrypt_xor(buffer, src_size, block_count * 6);
+    random_perm_offset += src_size / 2;
+    random_rot_offset += src_size;
 
+    encrypt_rot_64(buffer, src_size, random_rot_offset);
     encrypt_perm_block_8(buffer, src_size, random_perm_offset);
     encrypt_xor(buffer, src_size, block_count * 7);
 
@@ -204,38 +218,54 @@ status_t decrypt(u8* buffer, const size_t src_size)
         return ERR_NULL;
     }
 
-    size_t random_perm_offset = block_count * 8 + perm_random_count;
+    size_t random_perm_offset = xor_random_count + perm_random_count;
+    size_t random_rot_offset = (INT64_MAX) + (src_size * 8);
 
     encrypt_xor(buffer, src_size, block_count * 7);
     decrypt_perm_block_8(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_64(buffer, src_size, random_rot_offset - 8);
     random_perm_offset -= src_size / 1;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 6);
     decrypt_perm_block_16(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_56(buffer, src_size, random_rot_offset - 7);
     random_perm_offset -= src_size / 2;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 5);
     decrypt_perm_block_24(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_48(buffer, src_size, random_rot_offset - 6);
     random_perm_offset -= src_size / 3;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 4);
     decrypt_perm_block_32(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_40(buffer, src_size, random_rot_offset - 5);
     random_perm_offset -= src_size / 4;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 3);
     decrypt_perm_block_40(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_32(buffer, src_size, random_rot_offset - 4);
     random_perm_offset -= src_size / 5;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 2);
     decrypt_perm_block_48(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_24(buffer, src_size, random_rot_offset - 3);
     random_perm_offset -= src_size / 6;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 1);
     decrypt_perm_block_56(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_16(buffer, src_size, random_rot_offset - 2);
     random_perm_offset -= src_size / 7;
+    random_rot_offset -= src_size;
 
     encrypt_xor(buffer, src_size, block_count * 0);
     decrypt_perm_block_64(buffer, src_size, random_perm_offset - 1);
+    decrypt_rot_8(buffer, src_size, random_rot_offset - 1);
 
 
     return ERR_NONE;
@@ -245,8 +275,9 @@ status_t decrypt(u8* buffer, const size_t src_size)
 static void encrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
 {
     size_t rand_counter = 0;
-    for (size_t i = 0; i < size; ++i)
+    for (size_t i = 0; i < size; ++i) {
         buffer[i] = ROT_8((u32)buffer[i], 1 + (random_get(rand_index + (rand_counter++)) % 7));
+    }
 }
 static void encrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
 {
@@ -314,35 +345,87 @@ static void encrypt_rot_64(u8* buffer, const size_t size, const size_t rand_inde
 
 static void decrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    for (size_t i = size; i > 0; --i) {
+        buffer[i - 1] = ROT_8((u32)buffer[i - 1], 7 - (random_get(rand_index - (rand_counter++)) % 7));
+    }
 }
 static void decrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 1;
+    for (; i > 0;) {
+        --i;
+        set_block_16(
+            buffer + i,
+            ROT_16(get_block_16(buffer + i), 15 - (random_get(rand_index - (rand_counter++)) % 15)));
+    }
 }
 static void decrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 2;
+    for (; i > 0;) {
+        --i;
+        set_block_24(
+            buffer + i,
+            ROT_24(get_block_24(buffer + i), 23 - (random_get(rand_index - (rand_counter++)) % 23)));
+    }
 }
 static void decrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 3;
+    for (; i > 0;) {
+        --i;
+        set_block_32(
+            buffer + i,
+            ROT_32(get_block_32(buffer + i), 31 - (random_get(rand_index - (rand_counter++)) % 31)));
+    }
 }
 static void decrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 4;
+    for (; i > 0;) {
+        --i;
+        set_block_40(
+            buffer + i,
+            ROT_40(get_block_40(buffer + i), 39 - (random_get(rand_index - (rand_counter++)) % 39)));
+    }
 }
 static void decrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 5;
+    for (; i > 0;) {
+        --i;
+        set_block_48(
+            buffer + i,
+            ROT_48(get_block_48(buffer + i), 47 - (random_get(rand_index - (rand_counter++)) % 47)));
+    }
 }
 static void decrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 6;
+    for (; i > 0;) {
+        --i;
+        set_block_56(
+            buffer + i,
+            ROT_56(get_block_56(buffer + i), 55 - (random_get(rand_index - (rand_counter++)) % 55)));
+    }
 }
 static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index)
 {
-
+    size_t rand_counter = 0;
+    size_t i = size - 7;
+    for (; i > 0;) {
+        --i;
+        set_block_64(
+            buffer + i,
+            ROT_64(get_block_64(buffer + i), 63 - (random_get(rand_index - (rand_counter++)) % 63)));
+    }
 }
 
 /*****************************************************************************************************************/
