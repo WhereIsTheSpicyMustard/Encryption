@@ -6,8 +6,8 @@
 #include <string.h>
 #include "random.h"
 
-#include <assert.h>
-
+#define RANDOM_ROT_OFFSET INT64_MAX
+#define RANDOM_PERM_OFFSET (INT64_MAX >> 2)
 
 /*****************************************************************************************************************/
 // These are helper functions that trust the caller.
@@ -106,236 +106,212 @@ static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_inde
 
 
 // performs a xor opperation on the entire buffer
-static void encrypt_xor(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_xor(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t j = 0; (j + 3) < size; j += 4)
         set_block_32(buffer + j, get_block_32(buffer + j) ^ random_get(rand_index + (rand_counter++)));
 }
 
 status_t encrypt(u8* buffer, const size_t src_size)
 {
-    assert(src_size % 840 == 0);
-
-    // number of u32 blocks
-    const size_t block_count = src_size / 4;
-
-    // number of random values needed for xor
-    const size_t xor_random_count = 8 * (src_size / 4);
-
-    // number of random values needed for permuations
-    const size_t perm_random_count =
-        (src_size / 1) +
-        (src_size / 2) +
-        (src_size / 3) +
-        (src_size / 4) +
-        (src_size / 5) +
-        (src_size / 6) +
-        (src_size / 7) +
-        (src_size / 8);
+    if (src_size % 840 != 0 || src_size < 840) {
+        ERROR_REPORT(ERR_FAIL);
+        return ERR_FAIL;
+    }
 
     if (buffer == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
 
-    size_t random_perm_offset = xor_random_count;
-    size_t random_rot_offset = INT64_MAX; // some large constant
+    u64 random_perm_offset = RANDOM_PERM_OFFSET;
+    u64 random_rot_offset = RANDOM_ROT_OFFSET;
 
     encrypt_rot_8(buffer, src_size, random_rot_offset);
     encrypt_perm_block_64(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 0);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 0);
     random_perm_offset += src_size / 8;
     random_rot_offset += src_size;
 
     encrypt_rot_16(buffer, src_size, random_rot_offset);
     encrypt_perm_block_56(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 1);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 1);
     random_perm_offset += src_size / 7;
     random_rot_offset += src_size;
 
     encrypt_rot_24(buffer, src_size, random_rot_offset);
     encrypt_perm_block_48(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 2);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 2);
     random_perm_offset += src_size / 6;
     random_rot_offset += src_size;
 
     encrypt_rot_32(buffer, src_size, random_rot_offset);
     encrypt_perm_block_40(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 3);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 3);
     random_perm_offset += src_size / 5;
     random_rot_offset += src_size;
 
     encrypt_rot_40(buffer, src_size, random_rot_offset);
     encrypt_perm_block_32(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 4);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 4);
     random_perm_offset += src_size / 4;
     random_rot_offset += src_size;
 
     encrypt_rot_48(buffer, src_size, random_rot_offset);
     encrypt_perm_block_24(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 5);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 5);
     random_perm_offset += src_size / 3;
     random_rot_offset += src_size;
 
     encrypt_rot_56(buffer, src_size, random_rot_offset);
     encrypt_perm_block_16(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 6);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 6);
     random_perm_offset += src_size / 2;
     random_rot_offset += src_size;
 
     encrypt_rot_64(buffer, src_size, random_rot_offset);
     encrypt_perm_block_8(buffer, src_size, random_perm_offset);
-    encrypt_xor(buffer, src_size, block_count * 7);
-
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 7);
 
     return ERR_NONE;
 }
 
 status_t decrypt(u8* buffer, const size_t src_size)
 {
-    assert(src_size % 840 == 0);
-
-    // number of u32 blocks
-    const size_t block_count = src_size / 4;
-
-    // number of random values needed for xor
-    const size_t xor_random_count = 8 * (src_size / 4);
-
-    // number of random values needed for permuations
-    const size_t perm_random_count =
-    (src_size / 1) +
-    (src_size / 2) +
-    (src_size / 3) +
-    (src_size / 4) +
-    (src_size / 5) +
-    (src_size / 6) +
-    (src_size / 7) +
-    (src_size / 8);
+    if (src_size % 840 != 0 || src_size < 840) {
+        ERROR_REPORT(ERR_FAIL);
+        return ERR_FAIL;
+    }
 
     if (buffer == NULL) {
         ERROR_REPORT(ERR_NULL);
         return ERR_NULL;
     }
 
-    size_t random_perm_offset = xor_random_count + perm_random_count;
-    size_t random_rot_offset = (INT64_MAX) + (src_size * 8);
+    // number of random values needed for permuations
+    const u64 perm_random_count = (u64)(
+        (src_size / 1) + (src_size / 2) + (src_size / 3) + (src_size / 4) +
+        (src_size / 5) + (src_size / 6) + (src_size / 7) + (src_size / 8)
+    );
 
-    encrypt_xor(buffer, src_size, block_count * 7);
+    u64 random_perm_offset = RANDOM_PERM_OFFSET + perm_random_count;
+    u64 random_rot_offset = RANDOM_ROT_OFFSET + ((u64)src_size * 8);
+
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 7);
     decrypt_perm_block_8(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_64(buffer, src_size, random_rot_offset - 8);
     random_perm_offset -= src_size / 1;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 6);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 6);
     decrypt_perm_block_16(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_56(buffer, src_size, random_rot_offset - 7);
     random_perm_offset -= src_size / 2;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 5);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 5);
     decrypt_perm_block_24(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_48(buffer, src_size, random_rot_offset - 6);
     random_perm_offset -= src_size / 3;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 4);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 4);
     decrypt_perm_block_32(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_40(buffer, src_size, random_rot_offset - 5);
     random_perm_offset -= src_size / 4;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 3);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 3);
     decrypt_perm_block_40(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_32(buffer, src_size, random_rot_offset - 4);
     random_perm_offset -= src_size / 5;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 2);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 2);
     decrypt_perm_block_48(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_24(buffer, src_size, random_rot_offset - 3);
     random_perm_offset -= src_size / 6;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 1);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 1);
     decrypt_perm_block_56(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_16(buffer, src_size, random_rot_offset - 2);
     random_perm_offset -= src_size / 7;
     random_rot_offset -= src_size;
 
-    encrypt_xor(buffer, src_size, block_count * 0);
+    encrypt_xor(buffer, src_size, (src_size >> 2) * 0);
     decrypt_perm_block_64(buffer, src_size, random_perm_offset - 1);
     decrypt_rot_8(buffer, src_size, random_rot_offset - 1);
-
 
     return ERR_NONE;
 }
 
 /*****************************************************************************************************************/
-static void encrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_8 (u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; i < size; ++i) {
         buffer[i] = ROT_8((u32)buffer[i], 1 + (random_get(rand_index + (rand_counter++)) % 7));
     }
 }
-static void encrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_16(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 1) < size; ++i) {
         set_block_16(
             buffer + i,
             ROT_16(get_block_16(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 15)));
     }
 }
-static void encrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_24(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 2) < size; ++i) {
         set_block_24(
             buffer + i,
             ROT_24(get_block_24(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 23)));
     }
 }
-static void encrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_32(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 3) < size; ++i) {
         set_block_32(
             buffer + i,
             ROT_32(get_block_32(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 31)));
     }
 }
-static void encrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_40(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 4) < size; ++i) {
         set_block_40(
             buffer + i,
             ROT_40(get_block_40(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 39)));
     }
 }
-static void encrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_48(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 5) < size; ++i) {
         set_block_48(
             buffer + i,
             ROT_48(get_block_48(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 47)));
     }
 }
-static void encrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_56(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 6) < size; ++i) {
         set_block_56(
             buffer + i,
             ROT_56(get_block_56(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 55)));
     }
 }
-static void encrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_rot_64(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 7) < size; ++i) {
         set_block_64(
             buffer + i,
@@ -343,16 +319,16 @@ static void encrypt_rot_64(u8* buffer, const size_t size, const size_t rand_inde
     }
 }
 
-static void decrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_8 (u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = size; i > 0; --i) {
         buffer[i - 1] = ROT_8((u32)buffer[i - 1], 7 - (random_get(rand_index - (rand_counter++)) % 7));
     }
 }
-static void decrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_16(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 1;
     for (; i > 0;) {
         --i;
@@ -361,9 +337,9 @@ static void decrypt_rot_16(u8* buffer, const size_t size, const size_t rand_inde
             ROT_16(get_block_16(buffer + i), 15 - (random_get(rand_index - (rand_counter++)) % 15)));
     }
 }
-static void decrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_24(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 2;
     for (; i > 0;) {
         --i;
@@ -372,9 +348,9 @@ static void decrypt_rot_24(u8* buffer, const size_t size, const size_t rand_inde
             ROT_24(get_block_24(buffer + i), 23 - (random_get(rand_index - (rand_counter++)) % 23)));
     }
 }
-static void decrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_32(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 3;
     for (; i > 0;) {
         --i;
@@ -383,9 +359,9 @@ static void decrypt_rot_32(u8* buffer, const size_t size, const size_t rand_inde
             ROT_32(get_block_32(buffer + i), 31 - (random_get(rand_index - (rand_counter++)) % 31)));
     }
 }
-static void decrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_40(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 4;
     for (; i > 0;) {
         --i;
@@ -394,9 +370,9 @@ static void decrypt_rot_40(u8* buffer, const size_t size, const size_t rand_inde
             ROT_40(get_block_40(buffer + i), 39 - (random_get(rand_index - (rand_counter++)) % 39)));
     }
 }
-static void decrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_48(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 5;
     for (; i > 0;) {
         --i;
@@ -405,9 +381,9 @@ static void decrypt_rot_48(u8* buffer, const size_t size, const size_t rand_inde
             ROT_48(get_block_48(buffer + i), 47 - (random_get(rand_index - (rand_counter++)) % 47)));
     }
 }
-static void decrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_56(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 6;
     for (; i > 0;) {
         --i;
@@ -416,9 +392,9 @@ static void decrypt_rot_56(u8* buffer, const size_t size, const size_t rand_inde
             ROT_56(get_block_56(buffer + i), 55 - (random_get(rand_index - (rand_counter++)) % 55)));
     }
 }
-static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_rot_64(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size - 7;
     for (; i > 0;) {
         --i;
@@ -430,10 +406,9 @@ static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_inde
 
 /*****************************************************************************************************************/
 
-static void encrypt_perm_block_8(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_8(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
-
+    u64 rand_counter = 0;
     for (size_t i = 0; i < size; ++i) {
         const size_t j = random_get(rand_index + (rand_counter++)) % (i + 1);
         const u8 temp = buffer[i];
@@ -442,10 +417,9 @@ static void encrypt_perm_block_8(u8* buffer, const size_t size, const size_t ran
     }
 }
 
-static void decrypt_perm_block_8(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_8(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
-
+    u64 rand_counter = 0;
     for (size_t i = size; i > 0; --i) {
         const size_t j = random_get(rand_index - (rand_counter++)) % ((i - 1) + 1);
         const u8 temp = buffer[i - 1];
@@ -455,9 +429,9 @@ static void decrypt_perm_block_8(u8* buffer, const size_t size, const size_t ran
 }
 
 
-static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_16(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 1) < size; i += 2) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/2 + 1) * 2);
         const u16 temp = get_block_16(buffer + i);
@@ -466,9 +440,9 @@ static void encrypt_perm_block_16(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_16(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 2;) {
         i -= 2;
@@ -480,9 +454,9 @@ static void decrypt_perm_block_16(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_24(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 2) < size; i += 3) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/3 + 1) * 3);
         const u32 temp = get_block_24(buffer + i);
@@ -491,9 +465,9 @@ static void encrypt_perm_block_24(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_24(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_24(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 3;) {
         i -= 3;
@@ -505,9 +479,9 @@ static void decrypt_perm_block_24(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_32(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 3) < size; i += 4) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/4 + 1) * 4);
         const u32 temp = get_block_32(buffer + i);
@@ -516,9 +490,9 @@ static void encrypt_perm_block_32(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_32(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_32(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 4;) {
         i -= 4;
@@ -530,9 +504,9 @@ static void decrypt_perm_block_32(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_40(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 4) < size; i += 5) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/5 + 1) * 5);
         const u64 temp = get_block_40(buffer + i);
@@ -541,9 +515,9 @@ static void encrypt_perm_block_40(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_40(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_40(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 5;) {
         i -= 5;
@@ -555,9 +529,9 @@ static void decrypt_perm_block_40(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_48(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 5) < size; i += 6) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/6 + 1) * 6);
         const u64 temp = get_block_48(buffer + i);
@@ -566,9 +540,9 @@ static void encrypt_perm_block_48(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_48(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_48(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 6;) {
         i -= 6;
@@ -580,9 +554,9 @@ static void decrypt_perm_block_48(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_56(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 6) < size; i += 7) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/7 + 1) * 7);
         const u64 temp = get_block_56(buffer + i);
@@ -591,9 +565,9 @@ static void encrypt_perm_block_56(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_56(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_56(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 7;) {
         i -= 7;
@@ -605,9 +579,9 @@ static void decrypt_perm_block_56(u8* buffer, const size_t size, const size_t ra
 }
 
 
-static void encrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index)
+static void encrypt_perm_block_64(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     for (size_t i = 0; (i + 7) < size; i += 8) {
         const size_t j = (random_get(rand_index + (rand_counter++)) % (i/8 + 1) * 8);
         const u64 temp = get_block_64(buffer + i);
@@ -616,9 +590,9 @@ static void encrypt_perm_block_64(u8* buffer, const size_t size, const size_t ra
     }
 }
 
-static void decrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index)
+static void decrypt_perm_block_64(u8* buffer, const size_t size, const u64 rand_index)
 {
-    size_t rand_counter = 0;
+    u64 rand_counter = 0;
     size_t i = size;
     for (; i >= 8;) {
         i -= 8;

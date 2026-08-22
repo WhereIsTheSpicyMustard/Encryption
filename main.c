@@ -52,7 +52,7 @@ int main(void)
     /****************************************************/
     // load target file
     size_t buffer_size;
-    if (ask_string("Input target file", string_buffer, MAX_INPUT_LENGTH))
+    if (ask_string("Input target file (max 128 characters)", string_buffer, MAX_INPUT_LENGTH))
         CLEANUP("Error: could not read argument\n");
     buffer = load_file(string_buffer, &buffer_size);
     if (buffer == NULL)
@@ -63,7 +63,7 @@ int main(void)
 
     /********************************************************************/
     // load key from string
-    if (ask_string("Input encryption key (max 128 characters)", string_buffer, MAX_INPUT_LENGTH))
+    if (ask_string("Input encryption key (max 32 characters)", string_buffer, MAX_INPUT_LENGTH))
         CLEANUP("Error: could not read argument\n");
 
     size_t key_size;
@@ -154,7 +154,6 @@ int main(void)
         // extract padding
         padding = 1212121212;
         memcpy(&padding, buffer + 32, 8);
-        printf("Truncating %zu padded bytes\n", padding);
 
         u32 new_hash[8];
         memcpy(hash, buffer, 32);
@@ -166,15 +165,15 @@ int main(void)
         for (int i = 0; i < 8; ++i) {
             // printf("%08x | %08x\n", hash[i], new_hash[i]);
             if (hash[i] == new_hash[i]) continue;
-            printf("Warning: invalid hash.  No bytes truncated\n");
+            printf("Invalid hash. Opperation canceled\n");
             padding = 0;
-            goto INVALID_HASH;
+            goto cleanup;
 
         }
         printf("Success: hash verified\n");
-    }
+        printf("Truncating %zu padded bytes\n", padding);
 
-INVALID_HASH:
+    }
 
     if (MODE == 'd') {
         if (save_file(buffer + header_size, buffer_size - header_size - padding, DEC_STR))

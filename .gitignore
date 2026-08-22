@@ -1,5 +1,2 @@
 main
-*.enc
-*decrypted*
-*.bin
 *.txt

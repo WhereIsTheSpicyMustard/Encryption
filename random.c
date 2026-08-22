@@ -11,7 +11,7 @@
 typedef struct RandomContext {
     u32 key[8];
     u32 cache_data[8];
-    size_t cache_block;
+    u64 cache_block;
     int cache_valid;
 } RandomContext;
 
@@ -28,7 +28,7 @@ status_t random_create(u32 new_key[8])
     return ERR_NONE;
 }
 
-static status_t random_generate_block(const size_t block)
+static status_t random_generate_block(const u64 block)
 {
     u8 hash_bytes[40];
     memcpy(hash_bytes, context.key, 32);
@@ -43,9 +43,9 @@ static status_t random_generate_block(const size_t block)
     return ERR_NONE;
 }
 
-u32 random_get(const size_t index)
+u32 random_get(const u64 index)
 {
-    const size_t block = index / 8;
+    const u64 block = index / 8;
     if (!context.cache_valid || block != context.cache_block) {
         if (random_generate_block(block)) return 0;
     }
