@@ -1,8 +1,3 @@
-/*
-TODO
-- strip padding from decrypted output
-*/
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
