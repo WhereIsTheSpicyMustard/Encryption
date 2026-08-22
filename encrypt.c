@@ -11,16 +11,15 @@
 
 /*****************************************************************************************************************/
 // These are helper functions that trust the caller.
-// Ensure n != 0, a != 0, b != 0, c != 0
-static inline u8  ROTR_8  (u32 x, u32 n) { return (u8) ((x >> n) | (x << (8  - n))); }
-static inline u16 ROTR_16 (u32 x, u32 n) { return (u16)((x >> n) | (x << (16 - n))); }
-static inline u32 ROTR_32 (u32 x, u32 n) { return (x >> n) | (x << (32 - n)); }
-static inline u64 ROTR_64 (u64 x, u32 n) { return (x >> n) | (x << (64 - n)); }
-
-static inline u8  SIG_8  (u8  x, u32 a, u32 b, u32 c) { return ROTR_8 (x, a) ^ ROTR_8 (x, b) ^ ROTR_8 (x, c); }
-static inline u16 SIG_16 (u16 x, u32 a, u32 b, u32 c) { return ROTR_16(x, a) ^ ROTR_16(x, b) ^ ROTR_16(x, c); }
-static inline u32 SIG_32 (u32 x, u32 a, u32 b, u32 c) { return ROTR_32(x, a) ^ ROTR_32(x, b) ^ ROTR_32(x, c); }
-static inline u64 SIG_64 (u64 x, u32 a, u32 b, u32 c) { return ROTR_64(x, a) ^ ROTR_64(x, b) ^ ROTR_64(x, c); }
+// Ensure n > 0 and n < width of shift (ie. n < 32 for ROTR_32)
+static inline u8  ROT_8  (u32 x, u32 n) { return (u8) ((x >> n) | (x << (8  - n)));}
+static inline u16 ROT_16 (u32 x, u32 n) { return (u16)((x >> n) | (x << (16 - n)));}
+static inline u32 ROT_24 (u32 x, u32 n) { return       (x >> n) | (x << (24 - n)); }
+static inline u32 ROT_32 (u32 x, u32 n) { return       (x >> n) | (x << (32 - n)); }
+static inline u64 ROT_40 (u64 x, u32 n) { return       (x >> n) | (x << (40 - n)); }
+static inline u64 ROT_48 (u64 x, u32 n) { return       (x >> n) | (x << (48 - n)); }
+static inline u64 ROT_56 (u64 x, u32 n) { return       (x >> n) | (x << (56 - n)); }
+static inline u64 ROT_64 (u64 x, u32 n) { return       (x >> n) | (x << (64 - n)); }
 /*****************************************************************************************************************/
 
 
@@ -83,6 +82,28 @@ static void decrypt_perm_block_56(u8* buffer, const size_t size, const size_t ra
 static void decrypt_perm_block_64(u8* buffer, const size_t size, const size_t rand_index);
 /*****************************************************************************************************************/
 
+/*****************************************************************************************************************/
+// These are ROTR algorithms which scan the buffer byte by byte and rotate
+// by the specified chunk of bytes
+static void encrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index);
+static void encrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index);
+
+static void decrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index);
+static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index);
+/*****************************************************************************************************************/
+
 
 // performs a xor opperation on the entire buffer
 static void encrypt_xor(u8* buffer, const size_t size, const size_t rand_index)
@@ -123,6 +144,7 @@ status_t encrypt(u8* buffer, const size_t src_size)
 
     encrypt_perm_block_64(buffer, src_size, random_perm_offset);
     random_perm_offset += src_size / 8;
+
     encrypt_xor(buffer, src_size, block_count * 0);
 
     encrypt_perm_block_56(buffer, src_size, random_perm_offset);
@@ -220,6 +242,111 @@ status_t decrypt(u8* buffer, const size_t src_size)
 }
 
 /*****************************************************************************************************************/
+static void encrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; i < size; ++i)
+        buffer[i] = ROT_8((u32)buffer[i], 1 + (random_get(rand_index + (rand_counter++)) % 7));
+}
+static void encrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 1) < size; ++i) {
+        set_block_16(
+            buffer + i,
+            ROT_16(get_block_16(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 15)));
+    }
+}
+static void encrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 2) < size; ++i) {
+        set_block_24(
+            buffer + i,
+            ROT_24(get_block_24(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 23)));
+    }
+}
+static void encrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 3) < size; ++i) {
+        set_block_32(
+            buffer + i,
+            ROT_32(get_block_32(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 31)));
+    }
+}
+static void encrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 4) < size; ++i) {
+        set_block_40(
+            buffer + i,
+            ROT_40(get_block_40(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 39)));
+    }
+}
+static void encrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 5) < size; ++i) {
+        set_block_48(
+            buffer + i,
+            ROT_48(get_block_48(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 47)));
+    }
+}
+static void encrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 6) < size; ++i) {
+        set_block_56(
+            buffer + i,
+            ROT_56(get_block_56(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 55)));
+    }
+}
+static void encrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index)
+{
+    size_t rand_counter = 0;
+    for (size_t i = 0; (i + 7) < size; ++i) {
+        set_block_64(
+            buffer + i,
+            ROT_64(get_block_64(buffer + i), 1 + (random_get(rand_index + (rand_counter++)) % 63)));
+    }
+}
+
+static void decrypt_rot_8 (u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_16(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_24(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_32(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_40(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_48(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_56(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+static void decrypt_rot_64(u8* buffer, const size_t size, const size_t rand_index)
+{
+
+}
+
+/*****************************************************************************************************************/
+
 static void encrypt_perm_block_8(u8* buffer, const size_t size, const size_t rand_index)
 {
     size_t rand_counter = 0;
